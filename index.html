@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0"
+    />
+    <title>Reclaim Desktop</title>
+  </head>
+  <body>
+    <div id="boot-fallback" style="min-height:100vh;display:grid;place-items:center;padding:32px;background:linear-gradient(135deg,#f6f4ef 0%,#ece7df 45%,#f7f5f1 100%);color:#191919;font-family:'Segoe UI',system-ui,sans-serif;">
+      <section style="width:min(720px,100%);padding:28px;border-radius:24px;border:1px solid rgba(25,25,25,0.08);background:rgba(255,255,255,0.82);box-shadow:0 24px 80px rgba(28,27,25,0.12);">
+        <p style="margin:0 0 12px;letter-spacing:.14em;text-transform:uppercase;color:#6e675f;">Reclaim</p>
+        <h1 style="margin:0 0 12px;font-size:2rem;line-height:1;">Loading workspace...</h1>
+        <p style="margin:0;line-height:1.7;">If the app fails before React starts, this fallback should stay visible instead of a white screen.</p>
+        <div style="margin-top:18px;height:10px;border-radius:999px;background:rgba(25,25,25,0.08);overflow:hidden;">
+          <div style="width:38%;height:100%;border-radius:999px;background:#191919;animation:reclaimBootPulse 1.2s ease-in-out infinite;"></div>
+        </div>
+      </section>
+    </div>
+    <div id="root"></div>
+    <style>
+      @keyframes reclaimBootPulse {
+        0% { transform: translateX(-10%); width: 28%; }
+        50% { transform: translateX(40%); width: 52%; }
+        100% { transform: translateX(120%); width: 28%; }
+      }
+    </style>
+    <script type="module" src="/src/main.jsx"></script>
+  </body>
+</html>
