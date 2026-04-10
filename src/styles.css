@@ -776,6 +776,12 @@ button {
   grid-template-columns: minmax(0, 1.2fr) minmax(320px, 0.8fr);
 }
 
+.about-grid {
+  display: grid;
+  gap: 24px;
+  grid-template-columns: 1fr 1fr;
+}
+
 .library-list {
   display: grid;
   gap: 14px;
@@ -841,6 +847,7 @@ button {
   .template-grid,
   .library-grid,
   .settings-grid,
+  .about-grid,
   .summary-columns,
   .hero__metrics {
     grid-template-columns: 1fr;

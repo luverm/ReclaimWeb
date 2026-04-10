@@ -422,14 +422,14 @@ export default function App() {
           <div className="sidebar__meta">{sessionUser.company}</div>
         </div>
         <nav className="sidebar__nav">
-          {["workspace", "presentations", "templates", "library", "settings"].map((view) => (
+          {["workspace", "presentations", "templates", "library", "about", "settings"].map((view) => (
             <button
               key={view}
               className={`nav-item ${activeView === view ? "nav-item--active" : ""}`}
               type="button"
               onClick={() => setActiveView(view)}
             >
-              {view.charAt(0).toUpperCase() + view.slice(1)}
+              {view === "about" ? "About us" : view.charAt(0).toUpperCase() + view.slice(1)}
             </button>
           ))}
         </nav>
@@ -666,6 +666,51 @@ export default function App() {
                 </div>
               ) : <article className="summary-card summary-card--empty"><h3>Select a saved item</h3></article>}
             </section>
+          </section>
+        ) : null}
+
+        {activeView === "about" ? (
+          <section className="panel">
+            <div className="panel__heading">
+              <div>
+                <p className="eyebrow">About us</p>
+                <h2 className="section-title">The team behind Reclaim</h2>
+              </div>
+            </div>
+            <div className="about-grid">
+              <article className="summary-card summary-card--feature">
+                <h3>Our mission</h3>
+                <p>
+                  Reclaim helps teams cut through information overload. We believe that clear,
+                  structured communication is the foundation of effective work — and that AI
+                  should handle the formatting so humans can focus on decisions.
+                </p>
+              </article>
+              <article className="summary-card">
+                <h3>What we do</h3>
+                <p>
+                  We build tools that transform dense technical documents into client-ready
+                  summaries and presentations. Upload a report, connect your preferred AI
+                  provider, and get structured output in your house style — in seconds.
+                </p>
+              </article>
+              <article className="summary-card">
+                <h3>How it works</h3>
+                <ul>
+                  <li>Upload documents in .txt, .md, .docx, or .pdf format</li>
+                  <li>Connect OpenAI or Claude for AI-powered summarization</li>
+                  <li>Define your house style, tone, and brand rules</li>
+                  <li>Export structured summaries or branded slide decks</li>
+                </ul>
+              </article>
+              <article className="summary-card">
+                <h3>Get in touch</h3>
+                <p>
+                  Have questions or feedback? We'd love to hear from you. Reach out to our
+                  team and we'll get back to you as soon as possible.
+                </p>
+              </article>
+            </div>
           </section>
         ) : null}
 
