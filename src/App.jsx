@@ -72,6 +72,7 @@ export default function App() {
     label: "Starting Reclaim web app",
     value: 14
   });
+  const [serverOffline, setServerOffline] = useState(false);
   const [sessionUser, setSessionUser] = useState(null);
   const [authMode, setAuthMode] = useState("login");
   const [authLoading, setAuthLoading] = useState(false);
@@ -91,7 +92,9 @@ export default function App() {
   const [taskProgress, setTaskProgress] = useState({ active: false, label: "", value: 0 });
 
   const [settingsForm, setSettingsForm] = useState({
+    aiProvider: "openai",
     openaiApiKey: "",
+    anthropicApiKey: "",
     preferredModel: "gpt-4o-mini",
     brandName: "",
     brandTone: "clear, confident, technical",
@@ -103,6 +106,7 @@ export default function App() {
   const [presentationBrief, setPresentationBrief] = useState("");
   const [presentation, setPresentation] = useState(null);
   const [presentationLoading, setPresentationLoading] = useState(false);
+  const [presentationExporting, setPresentationExporting] = useState(false);
 
   useEffect(() => {
     window.localStorage.setItem(STORAGE_KEY, JSON.stringify(library));
@@ -113,9 +117,11 @@ export default function App() {
       setStartupState({ label: "Checking API connection", value: 28 });
 
       try {
-        await apiRequest("/api/health");
+        await apiRequest("/api/health", { timeoutMs: 3000 });
+        setServerOffline(false);
       } catch {
-        setStartupState({ label: "API unavailable, opening local web shell", value: 100 });
+        setServerOffline(true);
+        setStartupState({ label: "API unavailable, opening interface anyway", value: 100 });
         setAuthReady(true);
         return;
       }
@@ -133,6 +139,7 @@ export default function App() {
         setSessionUser(data.user);
         setSettingsForm((current) => ({
           ...current,
+          aiProvider: data.user.aiProvider || current.aiProvider,
           preferredModel: data.user.preferredModel || current.preferredModel,
           brandName: data.user.brand?.name || data.user.company || "",
           brandTone: data.user.brand?.tone || current.brandTone,
@@ -179,6 +186,7 @@ export default function App() {
       setSessionUser(data.user);
       setSettingsForm((current) => ({
         ...current,
+        aiProvider: data.user.aiProvider || current.aiProvider,
         brandName: data.user.brand?.name || data.user.company || "",
         preferredModel: data.user.preferredModel || current.preferredModel
       }));
@@ -258,7 +266,9 @@ export default function App() {
       setSessionUser(data.user);
       setSettingsForm((current) => ({
         ...current,
+        aiProvider: data.user.aiProvider,
         openaiApiKey: "",
+        anthropicApiKey: "",
         preferredModel: data.user.preferredModel,
         brandName: data.user.brand.name,
         brandTone: data.user.brand.tone,
@@ -316,6 +326,26 @@ export default function App() {
     }
   }
 
+  async function handleExportPresentation() {
+    if (!presentation) {
+      setStatusMessage("Generate a presentation first.");
+      return;
+    }
+
+    setPresentationExporting(true);
+    setTaskProgress({ active: true, label: "Building PowerPoint export", value: 52 });
+    try {
+      const { exportPresentationToPptx } = await import("./presentationExport");
+      await exportPresentationToPptx(presentation, sessionUser.brand);
+      setStatusMessage("PowerPoint exported");
+    } catch (error) {
+      setStatusMessage(error.message || "PowerPoint export failed.");
+    } finally {
+      setPresentationExporting(false);
+      setTaskProgress({ active: false, label: "", value: 100 });
+    }
+  }
+
   function handleSaveToLibrary() {
     if (!summary) {
       return;
@@ -366,15 +396,22 @@ export default function App() {
 
   if (!sessionUser) {
     return (
-      <AuthScreen
-        authMode={authMode}
-        setAuthMode={setAuthMode}
-        authForm={authForm}
-        setAuthForm={setAuthForm}
-        authMessage={authMessage}
-        authLoading={authLoading}
-        onSubmit={handleAuthSubmit}
-      />
+      <>
+        {serverOffline ? (
+          <section className="offline-banner" aria-live="polite">
+            <strong>Backend offline.</strong> Start the API with `npm.cmd run dev` or `npm.cmd run start` to use login, uploads, and AI features.
+          </section>
+        ) : null}
+        <AuthScreen
+          authMode={authMode}
+          setAuthMode={setAuthMode}
+          authForm={authForm}
+          setAuthForm={setAuthForm}
+          authMessage={serverOffline ? "The backend is not reachable yet." : authMessage}
+          authLoading={authLoading}
+          onSubmit={handleAuthSubmit}
+        />
+      </>
     );
   }
 
@@ -419,7 +456,7 @@ export default function App() {
         <header className="topbar">
           <div>
             <p className="eyebrow">Reclaim web app</p>
-            <h1>Upload documents, link your API key, and generate summaries and presentations in house style.</h1>
+            <h1>Upload documents, link OpenAI or Claude, and generate summaries and presentations in house style.</h1>
           </div>
           <div className="topbar__actions">
             <label className="button button--ghost file-button">
@@ -560,6 +597,8 @@ export default function App() {
             setBrief={setPresentationBrief}
             generating={presentationLoading}
             onGenerate={handleGeneratePresentation}
+            exporting={presentationExporting}
+            onExport={handleExportPresentation}
             presentation={presentation}
             brand={sessionUser.brand}
           />
@@ -635,21 +674,66 @@ export default function App() {
             <div className="panel__heading">
               <div>
                 <p className="eyebrow">Settings</p>
-                <h2 className="section-title">Link your OpenAI key and define your house style</h2>
+                <h2 className="section-title">Link OpenAI or Claude and define your house style</h2>
               </div>
-              <div className="pill">{sessionUser.hasApiKey ? `Linked: ${sessionUser.preferredModel}` : "No API key linked"}</div>
+              <div className="pill">
+                {sessionUser.hasApiKey
+                  ? `Linked: ${sessionUser.aiProvider} / ${sessionUser.preferredModel}`
+                  : "No API key linked"}
+              </div>
             </div>
             <div className="settings-grid">
               <article className="summary-card">
                 <h3>AI settings</h3>
                 <div className="auth-form">
                   <label className="field">
+                    <span>AI provider</span>
+                    <select
+                      value={settingsForm.aiProvider}
+                      onChange={(event) =>
+                        setSettingsForm((current) => ({
+                          ...current,
+                          aiProvider: event.target.value,
+                          preferredModel:
+                            event.target.value === "anthropic"
+                              ? current.preferredModel === "gpt-4o-mini"
+                                ? "claude-3-5-sonnet-latest"
+                                : current.preferredModel
+                              : current.preferredModel === "claude-3-5-sonnet-latest"
+                                ? "gpt-4o-mini"
+                                : current.preferredModel
+                        }))
+                      }
+                    >
+                      <option value="openai">OpenAI</option>
+                      <option value="anthropic">Claude (Anthropic)</option>
+                    </select>
+                  </label>
+                  <label className="field">
                     <span>OpenAI API key</span>
-                    <input value={settingsForm.openaiApiKey} onChange={(event) => setSettingsForm((c) => ({ ...c, openaiApiKey: event.target.value }))} type="password" placeholder="sk-..." />
+                    <input
+                      value={settingsForm.openaiApiKey}
+                      onChange={(event) => setSettingsForm((c) => ({ ...c, openaiApiKey: event.target.value }))}
+                      type="password"
+                      placeholder="sk-..."
+                    />
+                  </label>
+                  <label className="field">
+                    <span>Claude API key</span>
+                    <input
+                      value={settingsForm.anthropicApiKey}
+                      onChange={(event) => setSettingsForm((c) => ({ ...c, anthropicApiKey: event.target.value }))}
+                      type="password"
+                      placeholder="sk-ant-..."
+                    />
                   </label>
                   <label className="field">
                     <span>Preferred model</span>
-                    <input value={settingsForm.preferredModel} onChange={(event) => setSettingsForm((c) => ({ ...c, preferredModel: event.target.value }))} placeholder="gpt-4o-mini" />
+                    <input
+                      value={settingsForm.preferredModel}
+                      onChange={(event) => setSettingsForm((c) => ({ ...c, preferredModel: event.target.value }))}
+                      placeholder={settingsForm.aiProvider === "anthropic" ? "claude-3-5-sonnet-latest" : "gpt-4o-mini"}
+                    />
                   </label>
                 </div>
               </article>

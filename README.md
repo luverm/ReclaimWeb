@@ -7,9 +7,10 @@ A deployable Reclaim web app with:
 - local SQLite for development
 - hosted Postgres support for production
 - account login and session handling
-- OpenAI API key linking per user
+- OpenAI and Claude API key linking per user
 - `.txt`, `.md`, `.docx`, and `.pdf` import
 - AI summaries and house-style presentation generation
+- `.pptx` export from generated presentation structures
 
 ## Local development
 
@@ -75,13 +76,13 @@ Because the backend serves the built frontend, one web service is enough.
 
 - Hosting: Railway
 - Database: Railway Postgres or Supabase Postgres
-- AI calls: user-linked OpenAI API keys stored server-side in the database
+- AI calls: user-linked OpenAI or Claude API keys stored server-side in the database
 
 ## Current product flow
 
 1. Create an account.
 2. Go to `Settings`.
-3. Link an OpenAI API key.
+3. Link an OpenAI or Claude API key.
 4. Set brand tone, color, and slide rules.
 5. Upload source files or paste report text.
 6. Generate summaries and presentation structures in house style.

@@ -65,6 +65,16 @@ button {
   padding: 24px;
 }
 
+.offline-banner {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  padding: 14px 20px;
+  background: #191919;
+  color: white;
+  text-align: center;
+}
+
 .startup-card {
   width: min(100%, 520px);
   padding: 28px;

@@ -25,13 +25,22 @@ function publicUser(row) {
     return null;
   }
 
+  const aiProvider = row.ai_provider || "openai";
+  const hasOpenAiKey = Boolean(row.openai_api_key);
+  const hasAnthropicKey = Boolean(row.anthropic_api_key);
+
   return {
     id: Number(row.id),
     fullName: row.full_name,
     company: row.company,
     email: row.email,
+    aiProvider,
     preferredModel: row.preferred_model,
-    hasApiKey: Boolean(row.openai_api_key),
+    hasApiKey: aiProvider === "anthropic" ? hasAnthropicKey : hasOpenAiKey,
+    availableProviders: {
+      openai: hasOpenAiKey,
+      anthropic: hasAnthropicKey
+    },
     brand: {
       name: row.brand_name,
       tone: row.brand_tone,
@@ -39,6 +48,15 @@ function publicUser(row) {
       rules: row.brand_rules
     }
   };
+}
+
+function ensureSqliteColumn(name, definition) {
+  const columns = sqliteDb.prepare("PRAGMA table_info(users)").all();
+  if (columns.some((column) => column.name === name)) {
+    return;
+  }
+
+  sqliteDb.exec(`ALTER TABLE users ADD COLUMN ${name} ${definition}`);
 }
 
 async function initializeDatabase() {
@@ -56,7 +74,9 @@ async function initializeDatabase() {
         email TEXT NOT NULL UNIQUE,
         password_hash TEXT NOT NULL,
         password_salt TEXT NOT NULL,
+        ai_provider TEXT DEFAULT 'openai',
         openai_api_key TEXT DEFAULT '',
+        anthropic_api_key TEXT DEFAULT '',
         preferred_model TEXT DEFAULT 'gpt-4o-mini',
         brand_name TEXT DEFAULT '',
         brand_tone TEXT DEFAULT 'clear, confident, technical',
@@ -65,6 +85,15 @@ async function initializeDatabase() {
         created_at TEXT NOT NULL
       );
     `);
+
+    await pool.query("ALTER TABLE users ADD COLUMN IF NOT EXISTS ai_provider TEXT DEFAULT 'openai'");
+    await pool.query("ALTER TABLE users ADD COLUMN IF NOT EXISTS openai_api_key TEXT DEFAULT ''");
+    await pool.query("ALTER TABLE users ADD COLUMN IF NOT EXISTS anthropic_api_key TEXT DEFAULT ''");
+    await pool.query("ALTER TABLE users ADD COLUMN IF NOT EXISTS preferred_model TEXT DEFAULT 'gpt-4o-mini'");
+    await pool.query("ALTER TABLE users ADD COLUMN IF NOT EXISTS brand_name TEXT DEFAULT ''");
+    await pool.query("ALTER TABLE users ADD COLUMN IF NOT EXISTS brand_tone TEXT DEFAULT 'clear, confident, technical'");
+    await pool.query("ALTER TABLE users ADD COLUMN IF NOT EXISTS brand_primary_color TEXT DEFAULT '#101113'");
+    await pool.query("ALTER TABLE users ADD COLUMN IF NOT EXISTS brand_rules TEXT DEFAULT ''");
 
     await pool.query(`
       CREATE TABLE IF NOT EXISTS sessions (
@@ -86,7 +115,9 @@ async function initializeDatabase() {
       email TEXT NOT NULL UNIQUE,
       password_hash TEXT NOT NULL,
       password_salt TEXT NOT NULL,
+      ai_provider TEXT DEFAULT 'openai',
       openai_api_key TEXT DEFAULT '',
+      anthropic_api_key TEXT DEFAULT '',
       preferred_model TEXT DEFAULT 'gpt-4o-mini',
       brand_name TEXT DEFAULT '',
       brand_tone TEXT DEFAULT 'clear, confident, technical',
@@ -102,6 +133,15 @@ async function initializeDatabase() {
       FOREIGN KEY(user_id) REFERENCES users(id)
     );
   `);
+
+  ensureSqliteColumn("ai_provider", "TEXT DEFAULT 'openai'");
+  ensureSqliteColumn("openai_api_key", "TEXT DEFAULT ''");
+  ensureSqliteColumn("anthropic_api_key", "TEXT DEFAULT ''");
+  ensureSqliteColumn("preferred_model", "TEXT DEFAULT 'gpt-4o-mini'");
+  ensureSqliteColumn("brand_name", "TEXT DEFAULT ''");
+  ensureSqliteColumn("brand_tone", "TEXT DEFAULT 'clear, confident, technical'");
+  ensureSqliteColumn("brand_primary_color", "TEXT DEFAULT '#101113'");
+  ensureSqliteColumn("brand_rules", "TEXT DEFAULT ''");
 }
 
 async function createUser({ fullName, company, email, password }) {
@@ -217,13 +257,26 @@ async function getUserBySessionToken(token) {
 }
 
 async function updateUserSettings(userId, settings) {
+  const existingUser = await getUserById(userId);
+  const aiProvider = settings.aiProvider === "anthropic" ? "anthropic" : "openai";
+  const openaiApiKey =
+    typeof settings.openaiApiKey === "string" && settings.openaiApiKey.trim()
+      ? settings.openaiApiKey.trim()
+      : existingUser.openai_api_key || "";
+  const anthropicApiKey =
+    typeof settings.anthropicApiKey === "string" && settings.anthropicApiKey.trim()
+      ? settings.anthropicApiKey.trim()
+      : existingUser.anthropic_api_key || "";
+
   const values = [
-    settings.openaiApiKey || "",
-    settings.preferredModel || "gpt-4o-mini",
-    settings.brandName || "",
-    settings.brandTone || "clear, confident, technical",
-    settings.brandPrimaryColor || "#101113",
-    settings.brandRules || "",
+    aiProvider,
+    openaiApiKey,
+    anthropicApiKey,
+    settings.preferredModel || existingUser.preferred_model || "gpt-4o-mini",
+    settings.brandName || existingUser.brand_name || "",
+    settings.brandTone || existingUser.brand_tone || "clear, confident, technical",
+    settings.brandPrimaryColor || existingUser.brand_primary_color || "#101113",
+    settings.brandRules || existingUser.brand_rules || "",
     userId
   ];
 
@@ -232,13 +285,15 @@ async function updateUserSettings(userId, settings) {
       `
         UPDATE users
         SET
-          openai_api_key = $1,
-          preferred_model = $2,
-          brand_name = $3,
-          brand_tone = $4,
-          brand_primary_color = $5,
-          brand_rules = $6
-        WHERE id = $7
+          ai_provider = $1,
+          openai_api_key = $2,
+          anthropic_api_key = $3,
+          preferred_model = $4,
+          brand_name = $5,
+          brand_tone = $6,
+          brand_primary_color = $7,
+          brand_rules = $8
+        WHERE id = $9
         RETURNING *
       `,
       values
@@ -249,7 +304,9 @@ async function updateUserSettings(userId, settings) {
   sqliteDb.prepare(`
     UPDATE users
     SET
+      ai_provider = ?,
       openai_api_key = ?,
+      anthropic_api_key = ?,
       preferred_model = ?,
       brand_name = ?,
       brand_tone = ?,

@@ -1,12 +1,5 @@
 const OpenAI = require("openai");
-
-function getClient(apiKey) {
-  if (!apiKey) {
-    throw new Error("No OpenAI API key linked to this account.");
-  }
-
-  return new OpenAI({ apiKey });
-}
+const Anthropic = require("@anthropic-ai/sdk");
 
 function parseJson(text) {
   try {
@@ -21,10 +14,81 @@ function parseJson(text) {
   }
 }
 
-async function generateSummary({ apiKey, model, audience, length, documentText, fileName, brand }) {
-  const client = getClient(apiKey);
+function normalizeProvider(provider) {
+  return provider === "anthropic" ? "anthropic" : "openai";
+}
+
+function getProviderClient(provider, keys) {
+  if (provider === "anthropic") {
+    if (!keys.anthropicApiKey) {
+      throw new Error("No Claude API key linked to this account.");
+    }
+
+    return {
+      provider,
+      client: new Anthropic({ apiKey: keys.anthropicApiKey })
+    };
+  }
+
+  if (!keys.openaiApiKey) {
+    throw new Error("No OpenAI API key linked to this account.");
+  }
+
+  return {
+    provider: "openai",
+    client: new OpenAI({ apiKey: keys.openaiApiKey })
+  };
+}
+
+async function runJsonPrompt({ provider, client, model, prompt }) {
+  if (provider === "anthropic") {
+    const response = await client.messages.create({
+      model: model || "claude-3-5-sonnet-latest",
+      max_tokens: 2500,
+      messages: [
+        {
+          role: "user",
+          content: prompt
+        }
+      ]
+    });
+
+    const text = (response.content || [])
+      .filter((item) => item.type === "text")
+      .map((item) => item.text)
+      .join("\n");
+
+    return parseJson(text || "");
+  }
+
+  const response = await client.responses.create({
+    model: model || "gpt-4o-mini",
+    input: prompt
+  });
+
+  return parseJson(response.output_text || "");
+}
+
+async function generateSummary({
+  provider,
+  openaiApiKey,
+  anthropicApiKey,
+  model,
+  audience,
+  length,
+  documentText,
+  fileName,
+  brand
+}) {
+  const normalizedProvider = normalizeProvider(provider);
+  const { client } = getProviderClient(normalizedProvider, {
+    openaiApiKey,
+    anthropicApiKey
+  });
+
   const prompt = [
     "You are Reclaim, an AI assistant for engineering firms.",
+    `Provider mode: ${normalizedProvider}.`,
     `Audience: ${audience}.`,
     `Length: ${length}.`,
     `Document name: ${fileName}.`,
@@ -36,18 +100,32 @@ async function generateSummary({ apiKey, model, audience, length, documentText, 
     documentText
   ].join("\n");
 
-  const response = await client.responses.create({
-    model: model || "gpt-4o-mini",
-    input: prompt
+  return runJsonPrompt({
+    provider: normalizedProvider,
+    client,
+    model,
+    prompt
   });
-
-  return parseJson(response.output_text || "");
 }
 
-async function generatePresentation({ apiKey, model, brief, slideCount, brand }) {
-  const client = getClient(apiKey);
+async function generatePresentation({
+  provider,
+  openaiApiKey,
+  anthropicApiKey,
+  model,
+  brief,
+  slideCount,
+  brand
+}) {
+  const normalizedProvider = normalizeProvider(provider);
+  const { client } = getProviderClient(normalizedProvider, {
+    openaiApiKey,
+    anthropicApiKey
+  });
+
   const prompt = [
     "You create presentation outlines for engineering firms.",
+    `Provider mode: ${normalizedProvider}.`,
     `Brand name: ${brand.name || "Reclaim"}.`,
     `Brand tone: ${brand.tone || "clear, confident, technical"}.`,
     `Brand primary color: ${brand.primaryColor || "#101113"}.`,
@@ -58,12 +136,12 @@ async function generatePresentation({ apiKey, model, brief, slideCount, brand })
     brief
   ].join("\n");
 
-  const response = await client.responses.create({
-    model: model || "gpt-4o-mini",
-    input: prompt
+  return runJsonPrompt({
+    provider: normalizedProvider,
+    client,
+    model,
+    prompt
   });
-
-  return parseJson(response.output_text || "");
 }
 
 module.exports = {

@@ -4,7 +4,9 @@ export default function PresentationView({
   generating,
   onGenerate,
   presentation,
-  brand
+  brand,
+  exporting,
+  onExport
 }) {
   return (
     <section className="panel">
@@ -36,6 +38,14 @@ export default function PresentationView({
           <div className="editor-actions">
             <button className="button button--primary" disabled={generating} onClick={onGenerate} type="button">
               {generating ? "Generating..." : "Generate presentation"}
+            </button>
+            <button
+              className="button button--ghost"
+              disabled={!presentation?.slides?.length || exporting}
+              onClick={onExport}
+              type="button"
+            >
+              {exporting ? "Exporting..." : "Export .pptx"}
             </button>
           </div>
         </article>

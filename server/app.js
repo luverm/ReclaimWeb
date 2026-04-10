@@ -154,7 +154,9 @@ function createApp() {
   app.post("/api/ai/summarize", requireUser, async (req, res, next) => {
     try {
       const summary = await generateSummary({
-        apiKey: req.user.openai_api_key,
+        provider: req.user.ai_provider,
+        openaiApiKey: req.user.openai_api_key,
+        anthropicApiKey: req.user.anthropic_api_key,
         model: req.user.preferred_model,
         audience: req.body.audience,
         length: req.body.length,
@@ -171,7 +173,9 @@ function createApp() {
   app.post("/api/ai/presentation", requireUser, async (req, res, next) => {
     try {
       const presentation = await generatePresentation({
-        apiKey: req.user.openai_api_key,
+        provider: req.user.ai_provider,
+        openaiApiKey: req.user.openai_api_key,
+        anthropicApiKey: req.user.anthropic_api_key,
         model: req.user.preferred_model,
         brief: req.body.brief,
         slideCount: req.body.slideCount || 6,
