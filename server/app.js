@@ -20,6 +20,7 @@ const { generateSummary, generatePresentation } = require("./ai");
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 15 * 1024 * 1024 } });
 const PORT = Number(process.env.PORT || 8787);
 const distDir = path.join(process.cwd(), "dist");
+const assetsDir = path.join(distDir, "assets");
 
 function authToken(req) {
   const header = req.headers.authorization || "";
@@ -188,14 +189,38 @@ function createApp() {
   });
 
   if (fs.existsSync(distDir)) {
-    app.use(express.static(distDir));
-    app.get(/^(?!\/api\/).*/, (req, res) => {
+    if (fs.existsSync(assetsDir)) {
+      app.use(
+        "/assets",
+        express.static(assetsDir, {
+          fallthrough: false,
+          immutable: true,
+          maxAge: "1y"
+        })
+      );
+    }
+
+    app.use(
+      express.static(distDir, {
+        index: false
+      })
+    );
+
+    app.get("/", (_req, res) => {
+      res.sendFile(path.join(distDir, "index.html"));
+    });
+
+    app.get(/^(?!\/api\/|\/assets\/).*/, (req, res) => {
       res.sendFile(path.join(distDir, "index.html"));
     });
   }
 
   app.use((error, _req, res, _next) => {
     console.error(error);
+    if (error?.statusCode === 404 || error?.status === 404) {
+      res.status(404).json({ ok: false, message: "Not found." });
+      return;
+    }
     const message = error.message || "Unexpected server error.";
     res.status(500).json({ ok: false, message });
   });
